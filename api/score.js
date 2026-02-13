@@ -1,8 +1,8 @@
 import { kv } from '@vercel/kv';
 
-const LB_KEY = 'flappy_ryuku:lb2';
-const NAME_HASH = 'flappy_ryuku:names2';
-const NAME_KEY_PREFIX = 'flappy_ryuku:name2:';
+const LB_KEY = 'flappy_Ryku:lb2';
+const NAME_HASH = 'flappy_Ryku:names2';
+const NAME_KEY_PREFIX = 'flappy_Ryku:name2:';
 
 function getIp(req) {
   const xf = req.headers['x-forwarded-for'];
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
     // Basic rate limit: max 10 submits / minute / IP
     const ip = getIp(req);
-    const rlKey = `flappy_ryuku:rl:${ip}`;
+    const rlKey = `flappy_Ryku:rl:${ip}`;
     const n = await kv.incr(rlKey);
     if (n === 1) await kv.expire(rlKey, 60);
     if (n > 10) {
