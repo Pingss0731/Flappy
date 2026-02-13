@@ -1,7 +1,8 @@
 import { kv } from '@vercel/kv';
 
 const LB_KEY = 'flappy_ryuku:lb2';
-const NAME_KEY = 'flappy_ryuku:names2';
+const NAME_HASH = 'flappy_ryuku:names2';
+const NAME_KEY_PREFIX = 'flappy_ryuku:name2:';
 
 export default async function handler(req, res) {
   try {
@@ -16,11 +17,14 @@ export default async function handler(req, res) {
       return;
     }
 
-    const [rank0, score, name] = await Promise.all([
+    const [rank0, score, nameHash, nameKey] = await Promise.all([
       kv.zrevrank(LB_KEY, id),
       kv.zscore(LB_KEY, id),
-      kv.hget(NAME_KEY, id),
+      kv.hget(NAME_HASH, id).catch(() => null),
+      kv.get(`${NAME_KEY_PREFIX}${id}`).catch(() => null),
     ]);
+
+    const name = nameHash ?? nameKey;
 
     const rank = (rank0 === null || rank0 === undefined) ? null : Number(rank0) + 1;
 

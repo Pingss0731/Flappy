@@ -1,7 +1,8 @@
 import { kv } from '@vercel/kv';
 
 const LB_KEY = 'flappy_ryuku:lb2';
-const NAME_KEY = 'flappy_ryuku:names2';
+const NAME_HASH = 'flappy_ryuku:names2';
+const NAME_KEY_PREFIX = 'flappy_ryuku:name2:';
 
 function getIp(req) {
   const xf = req.headers['x-forwarded-for'];
@@ -43,8 +44,11 @@ export default async function handler(req, res) {
     }
 
     // Store best score per id. Update name mapping.
-    // Use explicit field/value form to avoid shape mismatches.
-    await kv.hset(NAME_KEY, id, name);
+    // KV hash helpers differ across runtimes, so we store name in TWO places:
+    // 1) Hash (for bulk reads)
+    // 2) Per-id key (for reliable lookup)
+    try { await kv.hset(NAME_HASH, id, name); } catch {}
+    try { await kv.set(`${NAME_KEY_PREFIX}${id}`, name); } catch {}
 
     const prev = await kv.zscore(LB_KEY, id);
     const prevScore = prev === null || prev === undefined ? null : Number(prev);

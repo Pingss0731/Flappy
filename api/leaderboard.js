@@ -1,7 +1,8 @@
 import { kv } from '@vercel/kv';
 
 const LB_KEY = 'flappy_ryuku:lb2';
-const NAME_KEY = 'flappy_ryuku:names2';
+const NAME_HASH = 'flappy_ryuku:names2';
+const NAME_KEY_PREFIX = 'flappy_ryuku:name2:';
 
 export default async function handler(req, res) {
   try {
@@ -21,12 +22,28 @@ export default async function handler(req, res) {
       ids.push(String(raw[i]));
     }
 
-    const names = ids.length ? await kv.hmget(NAME_KEY, ...ids) : [];
+    // Try hash bulk read first; if it fails or returns nulls, fall back to per-id keys.
+    let names = [];
+    try {
+      names = ids.length ? await kv.hmget(NAME_HASH, ...ids) : [];
+    } catch {
+      names = [];
+    }
+
+    // Fallback mget
+    let fallback = [];
+    try {
+      const keys = ids.map((id) => `${NAME_KEY_PREFIX}${id}`);
+      fallback = keys.length ? await kv.mget(...keys) : [];
+    } catch {
+      fallback = [];
+    }
 
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const score = Number(raw[i * 2 + 1]);
-      const name = names[i] ? String(names[i]).slice(0, 24) : 'Anonymous';
+      const nameRaw = (names[i] ?? fallback[i]);
+      const name = nameRaw ? String(nameRaw).slice(0, 24) : 'Anonymous';
       out.push({ id, name, score });
     }
 
