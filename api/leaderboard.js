@@ -56,27 +56,20 @@ export default async function handler(req, res) {
     const out = [];
     const ids = pairs.map((p) => String(p[0]));
 
-    // Try hash bulk read first; if it fails or returns nulls, fall back to per-id keys.
-    let names = [];
-    try {
-      names = ids.length ? await kv.hmget(NAME_HASH, ...ids) : [];
-    } catch {
-      names = [];
-    }
-
-    // Fallback mget
-    let fallback = [];
-    try {
-      const keys = ids.map((id) => `${NAME_KEY_PREFIX}${id}`);
-      fallback = keys.length ? await kv.mget(...keys) : [];
-    } catch {
-      fallback = [];
-    }
+    // Name lookup: avoid hmget/mget shape differences by doing per-id reads (still fast enough for top 100)
+    const names = await Promise.all(
+      ids.map(async (id) => {
+        const keyName = await kv.get(`${NAME_KEY_PREFIX}${id}`).catch(() => null);
+        if (keyName) return keyName;
+        const hashName = await kv.hget(NAME_HASH, id).catch(() => null);
+        return hashName;
+      })
+    );
 
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const score = Number(pairs[i][1]);
-      const nameRaw = (names[i] ?? fallback[i]);
+      const nameRaw = names[i];
       const name = nameRaw ? String(nameRaw).slice(0, 24) : 'Anonymous';
       out.push({ id, name, score });
     }
