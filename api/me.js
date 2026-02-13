@@ -1,8 +1,8 @@
 import { kv } from '@vercel/kv';
 
-const LB_KEY = 'flappy_ryuku:lb2';
-const NAME_HASH = 'flappy_ryuku:names2';
-const NAME_KEY_PREFIX = 'flappy_ryuku:name2:';
+const LB_KEY = 'flappy_Ryku:lb2';
+const NAME_HASH = 'flappy_Ryku:names2';
+const NAME_KEY_PREFIX = 'flappy_Ryku:name2:';
 
 export default async function handler(req, res) {
   try {

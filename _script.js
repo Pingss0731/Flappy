@@ -2,12 +2,59 @@
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
+// Loading screen elements
+const loadingEl = document.getElementById('loading');
+
 // --- Music (starts after user interaction) ---
 const music = new Audio('lofi.mp3');
 music.loop = true;
 music.preload = 'auto';
 music.volume = 0.25;
 let musicEnabled = false;
+
+// --- SFX (no files needed; synthesized) ---
+let audioCtx = null;
+function getAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // resume if suspended (mobile)
+  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  return audioCtx;
+}
+function playBeep({freq=600, dur=0.06, type='sine', gain=0.06}={}){
+  const ctx = getAudio();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = 0;
+  o.connect(g);
+  g.connect(ctx.destination);
+  const t = ctx.currentTime;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+function playThud(){
+  // quick down-sweep + noise feel
+  const ctx = getAudio();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = 'triangle';
+  const t = ctx.currentTime;
+  o.frequency.setValueAtTime(180, t);
+  o.frequency.exponentialRampToValueAtTime(60, t + 0.10);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.12, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.start(t);
+  o.stop(t + 0.16);
+}
 
 const muteBtn = document.getElementById('muteBtn');
 const vol = document.getElementById('vol');
@@ -65,11 +112,11 @@ const W = baseW, H = baseH;
 
 let state = "menu"; // menu | ready | playing | gameover
 let score = 0, best = 0;
-let playerName = (localStorage.getItem('flappyRyukuName') || '').trim();
-let playerId = (localStorage.getItem('flappyRyukuId') || '').trim();
+let playerName = (localStorage.getItem('flappy_RykuName') || '').trim();
+let playerId = (localStorage.getItem('flappy_RykuId') || '').trim();
 if(!playerId){
   playerId = (crypto?.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2)));
-  localStorage.setItem('flappyRyukuId', playerId);
+  localStorage.setItem('flappy_RykuId', playerId);
 }
 
 // Overlays
@@ -193,7 +240,7 @@ function showGameOver(){
 
 function startGame(){
   playerName = (nameInput?.value || '').trim();
-  localStorage.setItem('flappyRyukuName', playerName);
+  localStorage.setItem('flappy_RykuName', playerName);
 
   if(startOverlay) startOverlay.style.display = 'none';
   if(gameOverOverlay) gameOverOverlay.style.display = 'none';
@@ -408,6 +455,8 @@ function flap(){
   if(state === "ready"){ state = "playing"; }
   if(state === "playing"){
     bird.vy = FLAP_VEL;
+    // tap/flap sound
+    playBeep({ freq: 680, dur: 0.055, type: 'square', gain: 0.035 });
   }
   if(state === "gameover") reset();
 }
@@ -437,11 +486,11 @@ function updateStep(){
   const GROUND_H = 70;
   if(bird.y + bird.r > H-GROUND_H){
     bird.y = H-GROUND_H-bird.r;
-    if(state === "playing"){ state = "gameover"; showGameOver(); }
+    if(state === "playing"){ state = "gameover"; playThud(); showGameOver(); }
   }
   if(bird.y - bird.r < 0){
     bird.y = bird.r;
-    if(state === "playing"){ state = "gameover"; showGameOver(); }
+    if(state === "playing"){ state = "gameover"; playThud(); showGameOver(); }
   }
 
   // pipes
@@ -499,12 +548,14 @@ function updateStep(){
 
           if(hitTop || hitBot){
             state = "gameover";
+            playThud();
             showGameOver();
           }
         } else {
           if(rectCircleCollide(topRect.x, topRect.y, topRect.w, topRect.h, bird.x, bird.y, bird.r) ||
              rectCircleCollide(botRect.x, botRect.y, botRect.w, botRect.h, bird.x, bird.y, bird.r)){
             state = "gameover";
+            playThud();
             showGameOver();
           }
         }
@@ -569,11 +620,12 @@ function draw(){
       const alphaSave = ctx.globalAlpha;
 
       const drawContents = () => {
-        ctx.fillStyle = "#22c55e";
+        // Raiku vibe: neon pipes
+        ctx.fillStyle = "#C0FF38";
         ctx.fillRect(x, y, w0, h0);
 
         // lips
-        ctx.fillStyle = "#16a34a";
+        ctx.fillStyle = "#8DBD26";
         if(isTop) ctx.fillRect(x-6, y + h0 - 14, w0+12, 14);
         else ctx.fillRect(x-6, y, w0+12, 14);
 
@@ -630,9 +682,9 @@ function draw(){
   ctx.fillStyle = "#e7c58b";
   ctx.fillRect(0, groundY, W, groundH);
 
-  // grass strip (match pipe greens)
+  // grass strip (Raiku neon)
   const grassH = 18;
-  ctx.fillStyle = "#22c55e";
+  ctx.fillStyle = "#C0FF38";
   ctx.fillRect(0, groundY, W, grassH);
 
   // darker grass blocks (scrolls slowly like Flappy Bird)
@@ -640,10 +692,10 @@ function draw(){
   const scrollX = (performance.now() * 0.06) % tileW;
   for(let x = -tileW; x < W + tileW; x += tileW){
     const xx = x - scrollX;
-    ctx.fillStyle = "#16a34a";
+    ctx.fillStyle = "#8DBD26";
     ctx.fillRect(xx + 3, groundY + 3, tileW - 10, grassH - 6);
     // small accent block
-    ctx.fillStyle = "#128a43";
+    ctx.fillStyle = "#5A7A18";
     ctx.fillRect(xx + 8, groundY + 5, 6, grassH - 10);
   }
 
@@ -703,7 +755,7 @@ function draw(){
   if(state === "ready"){
     ctx.textAlign = "center";
     ctx.font = "bold 22px Arial";
-    ctx.fillText("Flappy Ryuku", W/2, H/2 - 55);
+    ctx.fillText("Flappy_Ryku", W/2, H/2 - 55);
     ctx.font = "14px Arial";
     ctx.fillText("Click / Space to start", W/2, H/2 - 28);
     ctx.fillText("Press R to restart anytime", W/2, H/2 - 8);
@@ -754,6 +806,28 @@ bird.frames = [f1, f2, f3, f4];
 
 // Outer line disabled
 bird.outlines = [];
+
+// Wait for core assets, then hide loading screen.
+const assets = [
+  new Promise((r)=>{ if(pipeWatermark.complete) r(); else pipeWatermark.onload = () => r(); }),
+  new Promise((r)=>{ if(f1.complete) r(); else f1.onload = () => r(); }),
+  new Promise((r)=>{ if(f2.complete) r(); else f2.onload = () => r(); }),
+  new Promise((r)=>{ if(f3.complete) r(); else f3.onload = () => r(); }),
+  new Promise((r)=>{ if(f4.complete) r(); else f4.onload = () => r(); }),
+  new Promise((r)=>{ if(music.readyState >= 2) r(); else music.addEventListener('canplaythrough', () => r(), { once:true }); }),
+];
+
+// Video-only loading screen (show for ~3–5 seconds)
+const startedAt = performance.now();
+const minShowMs = 3500;
+
+Promise.allSettled(assets).then(()=>{
+  const elapsed = performance.now() - startedAt;
+  const waitMore = Math.max(0, minShowMs - elapsed);
+  setTimeout(()=>{
+    if(loadingEl) loadingEl.classList.add('hide');
+  }, waitMore);
+});
 
 reset();
 requestAnimationFrame(loop);
