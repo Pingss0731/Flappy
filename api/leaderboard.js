@@ -85,6 +85,6 @@ export default async function handler(req, res) {
     res.status(200).json({ version: 'lb-2026-02-13a', entries: out });
   } catch (e) {
     console.error('leaderboard error', e);
-    res.status(500).json({ error: 'Server error', message: String(e?.message ?? e) });
+    res.status(500).json({ error: 'Server error', message: String(e?.message ?? e), version: 'lb-2026-02-13a' });
   }
 }
