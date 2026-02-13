@@ -46,11 +46,14 @@ export default async function handler(req, res) {
       const scores = await Promise.all(ids.map((id) => kv.zscore(LB_KEY, id).catch(() => null)));
       pairs = ids
         .map((id, i) => [id, Number(scores[i] ?? 0)])
-        .filter(([id]) => !!id);
+        .filter((p) => Array.isArray(p) && p[0]);
     }
 
+    // Defensive: remove any malformed entries
+    pairs = (pairs || []).filter((p) => Array.isArray(p) && p.length >= 2 && p[0]);
+
     const out = [];
-    const ids = pairs.map(([id]) => id);
+    const ids = pairs.map((p) => String(p[0]));
 
     // Try hash bulk read first; if it fails or returns nulls, fall back to per-id keys.
     let names = [];
