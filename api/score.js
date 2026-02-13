@@ -43,7 +43,8 @@ export default async function handler(req, res) {
     }
 
     // Store best score per id. Update name mapping.
-    await kv.hset(NAME_KEY, { [id]: name });
+    // Use explicit field/value form to avoid shape mismatches.
+    await kv.hset(NAME_KEY, id, name);
 
     const prev = await kv.zscore(LB_KEY, id);
     const prevScore = prev === null || prev === undefined ? null : Number(prev);
