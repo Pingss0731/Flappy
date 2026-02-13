@@ -15,12 +15,30 @@ export default async function handler(req, res) {
 
     // Top scores (desc)
     const raw = await kv.zrange(LB_KEY, 0, limit - 1, { rev: true, withScores: true });
-    // raw format: [id, score, id, score, ...]
-    const out = [];
-    const ids = [];
-    for (let i = 0; i < raw.length; i += 2) {
-      ids.push(String(raw[i]));
+
+    // Different KV backends can return different shapes when withScores=true.
+    // Support both:
+    // 1) flat array: [member, score, member, score, ...]
+    // 2) object array: [{ member, score }, ...]
+    const pairs = [];
+    if (Array.isArray(raw) && raw.length) {
+      if (typeof raw[0] === 'object' && raw[0] !== null) {
+        for (const r of raw) {
+          const id = String(r.member ?? r.value ?? r.id ?? '');
+          const score = Number(r.score ?? r.s ?? 0);
+          if (id) pairs.push([id, score]);
+        }
+      } else {
+        for (let i = 0; i < raw.length; i += 2) {
+          const id = String(raw[i] ?? '');
+          const score = Number(raw[i + 1] ?? 0);
+          if (id) pairs.push([id, score]);
+        }
+      }
     }
+
+    const out = [];
+    const ids = pairs.map(([id]) => id);
 
     // Try hash bulk read first; if it fails or returns nulls, fall back to per-id keys.
     let names = [];
@@ -41,7 +59,7 @@ export default async function handler(req, res) {
 
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
-      const score = Number(raw[i * 2 + 1]);
+      const score = Number(pairs[i][1]);
       const nameRaw = (names[i] ?? fallback[i]);
       const name = nameRaw ? String(nameRaw).slice(0, 24) : 'Anonymous';
       out.push({ id, name, score });
