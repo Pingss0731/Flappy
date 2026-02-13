@@ -24,8 +24,9 @@ export default async function handler(req, res) {
       // Support both:
       // 1) flat array: [member, score, member, score, ...]
       // 2) object array: [{ member, score }, ...]
+      const first = raw?.[0];
       if (Array.isArray(raw) && raw.length) {
-        if (typeof raw[0] === 'object' && raw[0] !== null) {
+        if (typeof first === 'object' && first !== null) {
           for (const r of raw) {
             const id = String(r.member ?? r.value ?? r.id ?? '');
             const score = Number(r.score ?? r.s ?? 0);
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
     }
 
     res.setHeader('Cache-Control', 'no-store');
-    res.status(200).json({ entries: out });
+    res.status(200).json({ version: 'lb-2026-02-13a', entries: out });
   } catch (e) {
     console.error('leaderboard error', e);
     res.status(500).json({ error: 'Server error', message: String(e?.message ?? e) });
